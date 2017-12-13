@@ -1,49 +1,72 @@
       program ISING_2D_metropolis
-        THIS IS A CHANGE
+        !Simulation of 2D Ising model with zero external field using Metropolis algorithm
+        !We follow the guide of:
+        !**************************************************************
+        !Toral, R., & Colet, P. (2014). Stochastic numerical methods:
+        !an introduction for students and scientists. John Wiley & Sons.
+        !Chapter 5
+        !**************************************************************
         !position (x,y) in grid is labbeled with with integer i=(y-1)*L+x
         implicit none
         integer*4 L,N
         parameter (L=100, N=L*L)
-        double precision T,u
+        double precision T,u,mag
         double precision hamil,dran_u !Real functions
         double precision h(-4:4),E
-        integer*4 i_dran,sum_n !integer function
+        integer*4 i_dran,sum_n !Integer function
         integer*4 neigh(4,N),s(N)
         integer*4 i,j,k,m,rd,steps,step_therm,prod_spin,aux
         call dran_ini(1994)
-        open(unit=1, file="energy.dat", status="unknown")
+        open(unit=1, file="averages.dat", status="unknown")
         neigh=0
         call Create_neigbours(neigh,L,N)
-        T=5.0d0 !temperature in J/Kb units
         call random_IC(s,N) !random initial condition
-        s=1
-        write(*,*) 1.0d0/dble(N),hamil(s,N,T,neigh)
-        write(1,*) 1.0d0/dble(N),hamil(s,N,T,neigh)
-        !Compute possible acceptance h(i)=min(1,exp(-beta*DH({s})))
-        !As there are only 4 NN and spin values are -1 or +1--> 5 different values of h
-        do i=-4,0,2
-          h(i)=1
-        enddo
-        h(2)=dexp(-4.0d0/T)
-        h(4)=dexp(-8.0d0/T)
 
-        !THERMALIZATION
-        step_therm=10000*N !1000 MC steps
-        aux=0
-        do i=1,step_therm
-          rd=i_dran(N) !choose spin at random
-          prod_spin=s(rd)*sum_n(rd,N,s,neigh)
-          u=dran_u()
-          if (h(prod_spin).ge.u) then !rejection step
-            s(rd)=-s(rd)
-          endif
-          aux=aux+1
-          if (aux.eq.N) then
-            aux=0
-            write(1,*) dble(i)/dble(N),hamil(s,N,T,neigh)
-          endif
-        enddo
+        do k=1,10
+        T=5.0d0-0.49d0*dble(k) !temperature in J/Kb units
 
+          !Compute possible acceptance h(i)=min(1,exp(-beta*DH({s})))
+          !As there are only 4 NN and spin values are -1 or +1--> 5 different values of h
+          !h(-4),h(-2),h(0),h(2),h(4)
+          do i=-4,0,2
+            h(i)=1
+          enddo
+          h(2)=dexp(-4.0d0/T)
+          h(4)=dexp(-8.0d0/T)
+
+          !THERMALIZATION
+          steps=1000*N !1000 MC steps
+          do i=1,steps
+            rd=i_dran(N) !choose spin at random
+            prod_spin=s(rd)*sum_n(rd,N,s,neigh)
+            u=dran_u()
+            if (h(prod_spin).ge.u) then !rejection step (CAN BE IMPROVED)
+              s(rd)=-s(rd)
+            endif
+          enddo
+
+          !INITIALIZE
+          mag=0.0d0
+
+          !MAIN PROGRAM
+          !+++++++++++++++++++++++++++++++++++++++++++++++++++
+          steps=1000 !Number of measures
+          do i=1,steps
+            do j=1,N !OME mc step
+              rd=i_dran(N) !choose spin at random
+              prod_spin=s(rd)*sum_n(rd,N,s,neigh)
+              u=dran_u()
+              if (h(prod_spin).ge.u) then !rejection step (CAN BE IMPROVED)
+                s(rd)=-s(rd)
+              endif
+            enddo
+            !MEASURE
+            mag=mag+abs(dble(sum(s)))
+          enddo
+          mag=mag/(dble(steps)*dble(N))
+          write(1,*) T,mag
+
+        enddo
         close(1)
       end
 
