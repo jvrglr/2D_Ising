@@ -2,11 +2,11 @@
         !position (x,y) in grid is labbeled with with integer i=(y-1)*L+x
         implicit none
         integer*4 L,N
-        parameter (L=32, N=L*L)
+        parameter (L=100, N=L*L)
         double precision T,u
         double precision hamil,dran_u !Real functions
-        double precision h(-4:4),E(10000)
-        integer*4 i_dran
+        double precision h(-4:4),E
+        integer*4 i_dran,sum_n !integer function
         integer*4 neigh(4,N),s(N)
         integer*4 i,j,k,m,rd,steps,step_therm,prod_spin,aux
         call dran_ini(1994)
@@ -15,7 +15,8 @@
         call Create_neigbours(neigh,L,N)
         T=5.0d0 !temperature in J/Kb units
         call random_IC(s,N) !random initial condition
-
+        s=1
+        write(*,*) 1.0d0/dble(N),hamil(s,N,T,neigh)
         write(1,*) 1.0d0/dble(N),hamil(s,N,T,neigh)
         !Compute possible acceptance h(i)=min(1,exp(-beta*DH({s})))
         !As there are only 4 NN and spin values are -1 or +1--> 5 different values of h
@@ -27,47 +28,42 @@
 
         !THERMALIZATION
         step_therm=10000*N !1000 MC steps
-        !step_therm=10
-        aux=0 !BORRAR aux
-        E=0.0d0
-        do m=1,1000
-          j=1
-          call random_IC(s,N) !random initial condition
-          do i=1,step_therm
-            j=i_dran(N)
-            prod_spin=0
-            do k=1,4
-              prod_spin=prod_spin+s(neigh(k,j))
-            enddo
-            prod_spin=s(j)*prod_spin
-            u=dran_u()
-            if (u.lt.h(prod_spin)) then
-              s(j)=-s(j)
-            endif
-            aux=aux+1
-            if (aux.eq.N) then
-              !write energy at each monte carlo step
-              aux=0
-              E(j)=E(j)+hamil(s,N,T,neigh)
-              j=j+1
-            endif
-          enddo
-      enddo
-      do i=1,10000
-        write(1,*) i, E(i)/10.0d2
-      enddo
-      write(*,*) 10.0d2
+        aux=0
+        do i=1,step_therm
+          rd=i_dran(N) !choose spin at random
+          prod_spin=s(rd)*sum_n(rd,N,s,neigh)
+          u=dran_u()
+          if (h(prod_spin).ge.u) then !rejection step
+            s(rd)=-s(rd)
+          endif
+          aux=aux+1
+          if (aux.eq.N) then
+            aux=0
+            write(1,*) dble(i)/dble(N),hamil(s,N,T,neigh)
+          endif
+        enddo
+
         close(1)
+      end
+
+      integer*4 function sum_n(rd,N,s,neigh)
+        integer*4 rd,N,i
+        integer*4 s(N),neigh(4,N)
+        !sum spins of all nearest neighbours of site rd
+        sum_n=0
+        do i=1,4
+          sum_n=sum_n+s(neigh(i,rd))
+        enddo
+        return
       end
 
       double precision function hamil(s,N,T,neigh)
         double precision T
-        !J=1!!!
-        !Actually, I'm computing -Hamiltonian
+        !Actually, I'm computing -Hamiltonian/J
         integer*4 N
         integer*4 s(N),neigh(4,N)
         integer*4 i,j
-        hamil=0
+        hamil=0.0d0
         do i=1,N
           do j=1,4 !4=number of NN
             hamil=hamil+s(i)*s(neigh(j,i))
@@ -98,8 +94,8 @@
         integer*4 neigh(4,N)
 
 
-        do k=1,L !coordinate x
-          do m=1,L !coordinate y
+        do k=1,L !coordinate x (coulmns)
+          do m=1,L !coordinate y (rows)
             j=(m-1)*L+k
 
             ! right neighbours
