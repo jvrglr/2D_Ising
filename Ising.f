@@ -1,4 +1,5 @@
       program ISING_2D_metropolis
+        THIS IS A CHANGE
         !position (x,y) in grid is labbeled with with integer i=(y-1)*L+x
         implicit none
         integer*4 L,N
