@@ -41,12 +41,7 @@
           !THERMALIZATION
           steps=1000*N !1000 MC steps
           do i=1,steps
-            rd=i_dran(N) !choose spin at random
-            prod_spin=s(rd)*sum_n(rd,N,s,neigh)
-            u=dran_u()
-            if (h(prod_spin).ge.u) then !rejection step (CAN BE IMPROVED)
-              s(rd)=-s(rd)
-            endif
+            call rejection(N,s,neigh,h)
           enddo
 
           !INITIALIZE
@@ -58,12 +53,7 @@
           do i=1,steps
             ! This loop pretends to decrease the correlation between measures
             do j=1,N  !ONE mc step
-              rd=i_dran(N) !choose spin at random
-              prod_spin=s(rd)*sum_n(rd,N,s,neigh)
-              u=dran_u()
-              if (h(prod_spin).ge.u) then !rejection step (CAN BE IMPROVED)
-                s(rd)=-s(rd)
-              endif
+              call rejection(N,s,neigh,h)
             enddo
 
             !MEASURE
@@ -74,6 +64,20 @@
 
         enddo
         close(1)
+      end
+
+      subroutine rejection(N,s,neigh,h)
+        integer*4 N,rd,prod_spin,sum_n,i_dran
+        integer*4 s(N),neigh(4,N)
+        double precision dran_u,u,h(-4:4)
+        !MAKES REJECTION STEP
+        rd=i_dran(N) !choose spin at random
+        prod_spin=s(rd)*sum_n(rd,N,s,neigh)
+        u=dran_u()
+        if (h(prod_spin).ge.u) then !rejection step (CAN BE IMPROVED)
+          s(rd)=-s(rd)
+        endif
+        return
       end
 
       integer*4 function sum_n(rd,N,s,neigh)
@@ -88,8 +92,9 @@
       end
 
       double precision function hamil(s,N,T,neigh)
-        double precision T
+        !compute Hamiltonian.
         !Actually, I'm computing -Hamiltonian/J
+        double precision T
         integer*4 N
         integer*4 s(N),neigh(4,N)
         integer*4 i,j
