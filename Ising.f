@@ -1,11 +1,15 @@
       program ISING_2D_metropolis
         !Simulation of 2D Ising model with zero external field using Metropolis algorithm
-        !We follow the guide of:
+        !Bibliography:
         !**************************************************************
         !Toral, R., & Colet, P. (2014). Stochastic numerical methods:
         !an introduction for students and scientists. John Wiley & Sons.
         !Chapter 5
+        !
+        !Tomás Sintes's notes:
+        !https://ifisc.uib-csic.es/users/tomas/MFCS/SquareLatticeIsing.pdf
         !**************************************************************
+
         !position (x,y) in grid is labbeled with with integer i=(y-1)*L+x
         implicit none
         integer*4 L,N
@@ -52,7 +56,8 @@
           !+++++++++++++++++++++++++++++++++++++++++++++++++++
           steps=1000 !Number of measures
           do i=1,steps
-            do j=1,N !OME mc step
+            ! This loop pretends to decrease the correlation between measures
+            do j=1,N  !ONE mc step
               rd=i_dran(N) !choose spin at random
               prod_spin=s(rd)*sum_n(rd,N,s,neigh)
               u=dran_u()
@@ -60,10 +65,11 @@
                 s(rd)=-s(rd)
               endif
             enddo
+
             !MEASURE
             mag=mag+abs(dble(sum(s)))
           enddo
-          mag=mag/(dble(steps)*dble(N))
+          mag=mag/(dble(steps)*dble(N)) !So magnetization is in [0,1]
           write(1,*) T,mag
 
         enddo
