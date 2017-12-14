@@ -14,24 +14,25 @@
         implicit none
         integer*4 L,N
         parameter (L=100, N=L*L)
-        double precision T,u,mag
+        double precision T,mag,sus,Cv,aux
         double precision hamil,dran_u !Real functions
         double precision h(-4:4),E
+        real start,finish !compute CPU time
         integer*4 i_dran,sum_n !Integer function
         integer*4 neigh(4,N),s(N)
-        integer*4 i,j,k,m,rd,steps,step_therm,prod_spin,aux
+        integer*4 i,j,k,m,steps,step_therm
         call dran_ini(1994)
         open(unit=1, file="averages.dat", status="unknown")
         neigh=0
         call Create_neigbours(neigh,L,N)
         call random_IC(s,N) !random initial condition
-
+        call cpu_time(start)
         do k=1,10
         T=5.0d0-0.49d0*dble(k) !temperature in J/Kb units
 
-          !Compute possible acceptance h(i)=min(1,exp(-beta*DH({s})))
-          !As there are only 4 NN and spin values are -1 or +1--> 5 different values of h
-          !h(-4),h(-2),h(0),h(2),h(4)
+        !Compute possible acceptance h(i)=min(1,exp(-beta*DH({s})))
+        !As there are only 4 NN and spin values are -1 or +1--> 5 different values of h
+        !h(-4),h(-2),h(0),h(2),h(4)
           do i=-4,0,2
             h(i)=1
           enddo
@@ -44,8 +45,11 @@
             call rejection(N,s,neigh,h)
           enddo
 
-          !INITIALIZE
-          mag=0.0d0
+          !INITIALIZE MEASURES
+          mag=0.0d0 !Magnetization
+          sus=0.0d0 !Magnetic susceptibility
+          E=0.0d0 !Energy
+          Cv=0.0d0 !Specific heat
 
           !MAIN PROGRAM
           !+++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -53,16 +57,25 @@
           do i=1,steps
             ! This loop pretends to decrease the correlation between measures
             do j=1,N  !ONE mc step
-              call rejection(N,s,neigh,h)
+              call rejection(N,s,neigh,h) !PROPOSAL/REJECTION
             enddo
 
             !MEASURE
             mag=mag+abs(dble(sum(s)))
+            sus=sus+abs(dble(sum(s)))**2.0d0
+            aux=hamil(s,N,T,neigh)
+            E=E+aux !It would be much more efficient to update E at each step
+            Cv=Cv+aux**2.0d0
           enddo
-          mag=mag/(dble(steps)*dble(N)) !So magnetization is in [0,1]
-          write(1,*) T,mag
+          mag=mag/(dble(steps)*dble(N)) !Magnetization is in [0,1]
+          sus=(sus/(dble(steps)*dble(N)**2.0d0)-mag**2.0d0)/T
+          E=E/dble(steps)
+          Cv=(Cv/dble(steps)-E**2.0d0)/T**2.0d0
+          write(1,*) T,mag,sus,E,Cv
 
         enddo
+        call cpu_time(finish)
+        write(*,*) 'Time in seconds',finish-start
         close(1)
       end
 
@@ -73,8 +86,11 @@
         !MAKES REJECTION STEP
         rd=i_dran(N) !choose spin at random
         prod_spin=s(rd)*sum_n(rd,N,s,neigh)
-        u=dran_u()
-        if (h(prod_spin).ge.u) then !rejection step (CAN BE IMPROVED)
+        if (prod_spin.le.0) then
+        !This first if avoid to invoke a pseudo random number at each step
+        !if prod_spin<=0 h=1--> change is always accepted
+          s(rd)=-s(rd)
+        else if (h(prod_spin).ge.dran_u()) then
           s(rd)=-s(rd)
         endif
         return
@@ -93,7 +109,7 @@
 
       double precision function hamil(s,N,T,neigh)
         !compute Hamiltonian.
-        !Actually, I'm computing -Hamiltonian/J
+        !Actually, I'm computing Hamiltonian/J
         double precision T
         integer*4 N
         integer*4 s(N),neigh(4,N)
@@ -101,7 +117,7 @@
         hamil=0.0d0
         do i=1,N
           do j=1,4 !4=number of NN
-            hamil=hamil+s(i)*s(neigh(j,i))
+            hamil=hamil-s(i)*s(neigh(j,i))
           enddo
         enddo
         return
