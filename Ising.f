@@ -6,29 +6,35 @@
         !an introduction for students and scientists. John Wiley & Sons.
         !Chapter 5
         !
-        !Tomás Sintes's notes:
+        !Tomás Sintes' notes:
         !https://ifisc.uib-csic.es/users/tomas/MFCS/SquareLatticeIsing.pdf
         !**************************************************************
 
-        !position (x,y) in grid is labbeled with with integer i=(y-1)*L+x
+        !REMARKS:
+        !-->Position (x,y) in grid is labbeled with with integer i=(y-1)*L+x
+        !-->To compute the effect of correlations between measures in the error
+        ! we have used an aproximation (R. Toral notes)
         implicit none
         integer*4 L,N
-        parameter (L=100, N=L*L)
-        double precision T,mag,sus,Cv,aux
+        parameter (L=50, N=L*L) !Lattice dimensions
+        double precision T,mag,sus,Cv,E !Observables
+        double precision tau,cm,cE,err_m,err_E !To compute errors
         double precision hamil,dran_u !Real functions
-        double precision h(-4:4),E
-        real start,finish !compute CPU time
-        integer*4 i_dran,sum_n !Integer function
+        double precision h(-4:4)
+        real start,finish !To compute CPU time
+        integer*4 i_dran,sum_n !Integer functions
         integer*4 neigh(4,N),s(N)
-        integer*4 i,j,k,m,steps,step_therm
+        double precision aux,last_value,last_value_E !Real dummy variables
+        integer*4 i,j,k,m,steps,step_therm !Integer dummy variables
         call dran_ini(1994)
-        open(unit=1, file="averages.dat", status="unknown")
+        open(unit=1, file="mag_vs_T.dat", status="unknown")
+        open(unit=2, file="E_vs_T.dat", status="unknown")
         neigh=0
         call Create_neigbours(neigh,L,N)
         call random_IC(s,N) !random initial condition
         call cpu_time(start)
         do k=1,10
-        T=5.0d0-0.49d0*dble(k) !temperature in J/Kb units
+        T=3.0d0-0.15d0*dble(k) !temperature in J/Kb units
 
         !Compute possible acceptance h(i)=min(1,exp(-beta*DH({s})))
         !As there are only 4 NN and spin values are -1 or +1--> 5 different values of h
@@ -50,7 +56,11 @@
           sus=0.0d0 !Magnetic susceptibility
           E=0.0d0 !Energy
           Cv=0.0d0 !Specific heat
-
+          cm=0.0d0 !one step correlation function (magnetization)
+          cE=0.0d0
+          tau=0.0d0
+          last_value=0.0d0
+          last_value_E=0.0d0
           !MAIN PROGRAM
           !+++++++++++++++++++++++++++++++++++++++++++++++++++
           steps=1000 !Number of measures
@@ -61,22 +71,48 @@
             enddo
 
             !MEASURE
-            mag=mag+abs(dble(sum(s)))
-            sus=sus+abs(dble(sum(s)))**2.0d0
+            aux=abs(dble(sum(s)))
+            mag=mag+aux
+            sus=sus+aux**2.0d0
+            cm=cm+aux*last_value
+            last_value=aux
+
             aux=hamil(s,N,T,neigh)
             E=E+aux !It would be much more efficient to update E at each step
             Cv=Cv+aux**2.0d0
+            cE=cE+aux*last_value_E
+            last_value_E=aux
+
           enddo
           mag=mag/(dble(steps)*dble(N)) !Magnetization is in [0,1]
-          sus=(sus/(dble(steps)*dble(N)**2.0d0)-mag**2.0d0)/T
+          sus=(sus/(dble(steps)*dble(N)**2.0d0)-mag**2.0d0)
+          cm=(cm/(dble(steps)*dble(N)**2.0d0)-mag**2.0)/sus
+          if (cm.ne.1.0) then !if cm=1 <m^2>=<m(i)m(i+1)>
+            tau=cm/(1.0d0-cm)
+          endif
+          write(*,*)"----------------------------------------"
+          write(*,*)sus,cm,tau
+          err_m=sqrt(sus*(2*tau+1)/dble(steps))
+          sus=sus/T
+
           E=E/dble(steps)
-          Cv=(Cv/dble(steps)-E**2.0d0)/T**2.0d0
-          write(1,*) T,mag,sus,E,Cv
+          Cv=(Cv/dble(steps)-E**2.0d0)
+          cE=(cE/dble(steps)-E**2.0d0)/Cv
+          if (cE.ne.1.0) then !if cE=1 <E^2>=<E(i)E(i+1)>
+            tau=cE/(1.0d0-cE)
+          endif
+          write(*,*)Cv,cE,tau
+          err_E=sqrt(cV*(2*tau+1)/dble(steps))
+          Cv=Cv/T**2.0d0
+
+          write(1,*) T,mag,err_m
+          write(2,*) T,E,err_E
 
         enddo
         call cpu_time(finish)
         write(*,*) 'Time in seconds',finish-start
         close(1)
+        close(2)
       end
 
       subroutine rejection(N,s,neigh,h)
