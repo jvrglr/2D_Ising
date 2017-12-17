@@ -59,8 +59,8 @@
           cm=0.0d0 !one step correlation function (magnetization)
           cE=0.0d0
           tau=0.0d0
-          last_value=0.0d0
-          last_value_E=0.0d0
+          last_value=abs(dble(sum(s)))
+          last_value_E=hamil(s,N,T,neigh)
           !MAIN PROGRAM
           !+++++++++++++++++++++++++++++++++++++++++++++++++++
           steps=1000 !Number of measures
@@ -86,7 +86,7 @@
           enddo
           mag=mag/(dble(steps)*dble(N)) !Magnetization is in [0,1]
           sus=(sus/(dble(steps)*dble(N)**2.0d0)-mag**2.0d0)
-          cm=(cm/(dble(steps)*dble(N)**2.0d0)-mag**2.0)/sus
+          cm=(cm/(dble(steps)*dble(N)**2.0d0)-mag**2.0d0)/sus
           if (cm.ne.1.0) then !if cm=1 <m^2>=<m(i)m(i+1)>
             tau=cm/(1.0d0-cm)
           endif
@@ -101,7 +101,7 @@
           if (cE.ne.1.0) then !if cE=1 <E^2>=<E(i)E(i+1)>
             tau=cE/(1.0d0-cE)
           endif
-          write(*,*)Cv,cE,tau
+          write(*,*)cV,cE,tau
           err_E=sqrt(cV*(2*tau+1)/dble(steps))
           Cv=Cv/T**2.0d0
 
